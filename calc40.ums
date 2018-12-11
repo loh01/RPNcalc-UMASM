@@ -1,0 +1,564 @@
+/////////////////////////////////////////////////////////
+//              calc40.ums                             //  
+//                                                     //
+// - Contains functions for initalizing the jumptable, //
+// and also contains the main function, functions for  //
+// each of the operations other than print, and helper //
+// functions                                           //
+// - Called by main                                    //
+//                                                     //
+///////////////////////////////////////////////////////// 
+
+
+// Program structure:
+// - Main keeps looping while the calculator is running till EOF is signalled
+// - Uses two states - waiting and entering
+//      - Waiting is the normal (and initial) state, which waits for user
+//        input
+//      - Waiting_with_character checks for EOF signal, and utilizes the
+//        jumptable to execute the respective operation associated with user
+//        input
+//      - Entering is the transition state when the machine sees a digit, and
+//        is used to fully read the number that the user inputs (single
+//        digit or multi digit)
+//
+// Register usage:
+// - User input is held in r1
+// - r5 is used to execute the respective operation associated with user
+//   input via the jumptable
+// - r5 is also occasionally used to help with equality comparisons
+// - r3 is used to help with proper numeral handling in the entering state
+
+
+//////////////////////////////////////////////////////////////////////////
+//                                                                      //
+//       Jumptable (i.e. switch statement) for operation handling       //
+//                                                                      //
+//////////////////////////////////////////////////////////////////////////
+
+
+.section rodata
+jumptable:
+        .space 256
+
+.section init
+        .temps r6,r7
+        .zero r0
+
+        goto init_jumptable linking r1
+
+        m[r0][jumptable + '0'] := digit
+        m[r0][jumptable + '1'] := digit
+        m[r0][jumptable + '2'] := digit
+        m[r0][jumptable + '3'] := digit
+        m[r0][jumptable + '4'] := digit
+        m[r0][jumptable + '5'] := digit
+        m[r0][jumptable + '6'] := digit
+        m[r0][jumptable + '7'] := digit
+        m[r0][jumptable + '8'] := digit
+        m[r0][jumptable + '9'] := digit
+        m[r0][jumptable + ' '] := waiting
+
+
+        ///////////// add
+        // Does: Adds two numbers together
+        // Arguments: Two numbers to add (on the stack)
+        // Register usage:
+        // - Both numbers will be popped off the stack and held in r3 and r4
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '+'] := add
+        .section text
+                add:
+                        goto check2 linking r1
+
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        r3 := r3 + r4
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// subtract
+        // Does: Subtracts one number from the other
+        // Arguments: Two numbers (on the stack)
+        // Register usage:
+        // - Both numbers will be popped off the stack and held in r3 and r4
+        // - The value in r4 will be subtracted by the value in r3
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '-'] := sub
+        .section text
+                sub:
+                        goto check2 linking r1
+                        
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        r3 := r4 - r3
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// multiply
+        // Does: Multiplies two numbers together
+        // Arguments: Two numbers to multiply(on the stack)
+        // Register usage:
+        // - Both numbers will be popped off the stack and held in r3 and r4
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '*'] := mul
+        .section text 
+                mul:
+                        goto check2 linking r1
+                        
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        r3 := r3 * r4
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// divide
+        // Does: Divides one number by the other
+        // Arguments: Two numbers (on the stack)
+        // Register usage:
+        // - Both numbers will be popped off the stack and held in r3 and r4
+        // - The value in r4 will be divided by the value in r3
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '/'] := div
+        .section text
+                div:
+                        goto check2 linking r1
+
+
+                        // x / y, where x is r4 and y is r3
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        if (r3 == 0) goto div_zero
+
+                        // if (r4 == 0x80000000) goto div_edgex
+
+                        if (r4 <s 0) goto div_negx using r5
+
+                        if (r3 <s 0) goto div_negy using r5
+
+                        r3 := r4 / r3
+                        push r3 on stack r2
+                        goto waiting
+
+
+        ///////////// bitwise 'or'
+        // Does: Conducts a bitwise 'or' operation on two numbers
+        // Arguments: Two numbers (on the stack)
+        // Register usage:
+        // - Both numbers will be popped off the stack and held in r3 and r4
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '|'] := or
+        .section text
+                or:
+
+                        goto check2 linking r1
+                        
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        r3 := r3 | r4
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// bitwise 'and'
+        // Does: Conducts a bitwise 'and' operation on two numbers
+        // Arguments: Two numbers (on the stack)
+        // Register usage:
+        // - Both numbers will be popped off the stack and held in r3 and r4
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '&'] := and
+        .section text
+                and:
+
+                        goto check2 linking r1
+                        
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        r3 := r3 & r4
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// change sign
+        // Does: Changes the sign of a number
+        // Arguments: One number (on the stack)
+        // Register usage:
+        // - The number will be popped off the stack and held in r3
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + 'c'] := neg
+        .section text
+                neg:
+
+                        goto check1 linking r1
+                        
+                        pop r3 off stack r2
+
+                        r3 := -r3
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// change to bitwise complement
+        // Does: Conducts a bitwise complement operation on a number
+        // Arguments: One number (on the stack)
+        // Register usage:
+        // - The number will be popped off the stack and held in r3
+        // - The result will be pushed back onto the stack by r3
+
+        .section init
+                m[r0][jumptable + '~'] := com
+        .section text
+                com:
+                        goto check1 linking r1
+
+                        pop r3 off stack r2
+
+                        r3 := ~r3
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// swap two values
+        // Does: Swaps the position of the top two numbers on the stack
+        // Arguments: Two numbers (on the stack)
+        // Register usage:
+        // - Both numbers will be popped off and pushed onto the stack by r3
+
+        .section init
+                m[r0][jumptable + 's'] := swap
+        .section text
+                swap:
+                        goto check2 linking r1
+
+                        pop r3 off stack r2
+                        pop r4 off stack r2
+
+                        push r3 on stack r2
+                        push r4 on stack r2
+
+                        goto waiting
+
+
+        ///////////// duplicate
+        // Does: Duplicates the top number on the stack
+        // Arguments: One number (on the stack)
+        // Register usage:
+        // - The numbers will be popped off once and pushed twice onto the 
+        //      stack by r3 
+
+        .section init
+                m[r0][jumptable + 'd'] := dup
+        .section text
+                dup:
+                        goto check1 linking r1
+
+                        pop r3 off stack r2
+
+                        push r3 on stack r2
+                        push r3 on stack r2
+
+                        goto waiting
+
+
+        ///////////// pop value
+        // Does: Pops off the top number on the stack
+        // Arguments: One number (on the stack)
+        // Register usage:
+        // - The numbers will be popped off the stack by r3
+
+        .section init
+                m[r0][jumptable + 'p'] := discard
+        .section text
+                discard:
+                        goto check1 linking r1
+
+                        pop r3 off stack r2
+
+                        goto waiting
+
+
+        ///////////// print
+        // Does: Prints all the numbers on the stack
+        // Arguments: None
+        // Register usage:
+        // - r1 will be used as the stack counter in the loop 
+        // - Each number on the stack will be accessed directly and held by r3
+        // - r4 will be used to hold the return address for the external
+        //      function call to printnum
+        // - r5 will be used to help with the equality comparison for checking
+        //      the end condition
+
+        .section init
+                m[r0][jumptable + '\n'] := print
+        .section text
+                print:
+                        goto checkp linking r1
+
+                        r1 := r2
+                        print_loop:
+                                // Loading number to be printed into r3
+                                r3 := m[r0][r1]                         
+                                goto printnum linking r4
+                                r1 := r1 + 1
+                                if (r1 != endstack) goto print_loop using r5
+                        goto waiting
+
+
+        ///////////// remove all values
+        // Does: Removes all the numbers from the stack
+        // Arguments: None
+        // Register usage:
+        // - The numbers will be popped off the stack by r3 
+        // - r5 will be used to help with the equality comparison for checking
+        //      the end condition
+
+        .section init
+                m[r0][jumptable + 'z'] := rmv
+        .section text
+                rmv:
+                        goto check1 linking r1
+                        pop_recurr:
+                                pop r3 off stack r2
+                                if (r2 != endstack) goto pop_recurr using r5
+
+                        goto waiting
+
+
+        .section init
+                goto start
+        
+
+
+// Name: init_jumptable
+// Does: sets all values in the jumptable to label input_error
+// Arguments: none
+// Register usage: 
+// - Address of each spot in jumptable stored in r3
+// - Counter for the loop in r4
+// - r5 is used to help with equality comparison
+
+.section init
+init_jumptable:
+
+        r3 := 0
+        r4 := 0
+
+        init_jumptable_loop:
+                r3 := jumptable + r4
+                m[r0][r3] := input_error
+                r4 := r4 + 1
+                if (r4 != 256) goto init_jumptable_loop using r5
+
+        goto r1
+
+
+//////////////////////////////////////////////////////////////////////////
+//                                                                      //
+//      Main program structure (main, waiting and entering states)      //
+//                                                                      //
+//////////////////////////////////////////////////////////////////////////
+
+
+.section text
+
+
+main:
+
+waiting:
+        r1 := input()
+
+waiting_with_character:
+        r1 := ~r1
+        if (r1 == r0) goto eop using r5
+
+        r1 := ~r1
+
+        r5 := jumptable + r1
+        r5 := m[r0][r5]
+        goto r5
+
+
+entering:
+        r1 := input()
+
+        if (r1 <s 48) goto waiting_with_character using r5
+        if (r1 >s 57) goto waiting_with_character using r5
+
+        r3 := r1 - 48
+
+        pop r1 off stack r2
+        r1 := r1 * 10
+        r1 := r1 + r3
+        push r1 on stack r2
+
+        goto entering 
+
+
+
+//////////////////////////////////////////////////////////////////////////
+//                                                                      //
+//                         Helper Functions                             //
+//                                                                      //
+//////////////////////////////////////////////////////////////////////////
+
+// Name: digit
+// Does: Handles a numerical user input by changing it from ASCII
+//      to binary representation before pushing it onto the stack
+
+digit:
+        r1 := r1 - 48
+        push r1 on stack r2
+        goto entering
+
+
+// Name: div_zero
+// Does: Prints an error message when the user tries to divide
+//      by zero, and restores the stack to the previous condition
+
+div_zero:
+    
+        push r4 on stack r2
+        push r3 on stack r2
+        output "Division by zero\n"
+
+        goto waiting
+
+
+// Name: div_negx
+// Does: Divides x by y (x / y), when x is negative
+// Arguments: The first two numbers on the stack
+// Register usage:
+// - r3 holds y and later the answer, r4 holds x
+
+div_negx:
+        if (r3 <s 0) goto div_negx_helper using r5
+
+        r4 := -r4 
+        r3 := r4 / r3
+        r3 := -r3
+        push r3 on stack r2
+
+        goto waiting 
+
+        div_negx_helper:
+                r3 := -r3
+                r4 := -r4
+                r3 := r4 / r3
+                push r3 on stack r2
+
+                goto waiting
+
+
+// Name: div_negy
+// Does: Divides x by y (x / y), when y is negative
+// Arguments: The first two numbers on the stack
+// Register usage:
+// - r3 holds y and later the answer, r4 holds x
+
+div_negy:
+        r3 := -r3
+        r3 := r4 / r3
+        r3 := -r3
+        push r3 on stack r2
+
+        goto waiting 
+
+
+// Name: input_error
+// Does: Prints an error message
+// Arguments: The user input character
+// Register usage:
+// - r1 holds the input character
+
+input_error:
+        output "Unknown character '"
+        output r1
+        output "'\n"
+        goto waiting
+
+
+// Name: eop
+// Does: Sets r1 to 1 and halts when the input reaches EOF
+
+eop:
+        r1 := 1
+        halt
+
+
+// Name: checkp
+// Does: Checks if there is at least one element on the stack before printing
+// Register usage:
+// - r3 points to the address of the element at the top of the stack (i.e 
+//      set to r2 + 1)
+// - r1 holds the return address
+
+checkp:
+        r3 := r2 + 1
+        if (r3 <=s endstack) goto r1 using r5
+
+        goto waiting
+
+
+// Name check1
+// Does: Checks if there is at least one element on the stack
+// Register usage:
+// - r3 points to the address of the element at the top of the stack (i.e 
+//      set to r2 + 1)
+// - r1 holds the return address
+
+check1:
+        r3 := r2 + 1
+        if (r3 <=s endstack) goto r1 using r5
+
+        output "Stack underflow---expected at least 1 element\n"
+        goto waiting
+    
+// Name check2
+// Does: Checks if there are at least two elements on the stack
+// Register usage:
+// - r3 points to the address of the second element from the top of the stack 
+//      (i.e set to r2 + 2)
+// - r1 holds the return address
+
+check2:
+        r3 := r2 + 2
+        if (r3 <=s endstack) goto r1 using r5
+
+        output "Stack underflow---expected at least 2 elements\n"
+        goto waiting
+
+
+
+
+
+

@@ -1,0 +1,16 @@
+//////////////////////////////////////////////
+//            	stack.ums               	//  
+//                                      	//
+// - Allocates space for the call stack,	//
+// and initializes the stack pointer        //
+//                                      	//
+////////////////////////////////////////////// 
+
+.zero r0
+.temps r6,r7
+.section stk
+.space 100000
+
+endstack:
+        .section init
+

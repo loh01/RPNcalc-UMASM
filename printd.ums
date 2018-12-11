@@ -1,0 +1,120 @@
+//////////////////////////////////////////
+//              printd.ums              //  
+//                                      //
+// - Contains the function for printing //
+// UM words in decimal                  //
+// - Called by main                     //
+//                                      //
+////////////////////////////////////////// 
+
+
+.temp r6, r7
+
+// Name: printnum
+// Does: Called by main, and handles cases for zero, negative, and positive
+// numbers
+// Arguments: A number to be printed
+// Register usage: 
+// - Number parameter has to be in r3
+// - Return address to main is stored in r4
+// - r5 is used to help with equality comparison
+printnum:
+        if (r3 == r0) goto print_zero using r5
+
+        // Edge case for the most negative number, 0x80000000
+        r5 := 0x80000000
+        if (r3 == r5) goto print_edgecase using r5
+
+        if (r3 <s r0) goto print_neg using r5
+
+        if (r3 >s r0) goto print_pos using r5
+
+
+// Name: print_zero
+// Does: Prints the leading arrows and zero, and returns
+print_zero:
+        output ">>> 0\n"
+        goto r4
+
+
+// Name: print_edgecase
+// Does: Prints the leading arrows and the most negative number, 0x80000000
+// and returns
+print_edgecase:
+        output ">>> -2147483648\n"
+        goto r4
+
+
+// Name: print_neg
+// Does: Prints leading arrows and negative sign, and hands over to 
+// printhelper
+print_neg:
+        output ">>> -"
+        r3 := -r3
+        goto printhelper
+
+
+// Name: print_pos
+// Does: Prints leading arrows, and hands over to printhelper
+print_pos:
+        output ">>> "
+        goto printhelper
+
+
+// Name: printhelper
+// Does: Calls the print_recurr function to help print the number 
+// recursively
+printhelper:                                                            
+        push r4 on stack r2             // save return address
+        goto print_recurr linking r4
+
+        output "\n"
+
+        pop r4 off stack r2             // Restoring return address
+        goto r4                         
+
+
+// Name: print_recurr
+// Does: Recursive helper function that calls print_base_case to print
+// all the digits of the number
+// Register usage: 
+// - r4 and r3 are used to push and pop the digit to print and return
+//      address for recursion. These are stored alternately on the stack
+print_recurr:
+        push r4 on stack r2
+        r4 := r3 mod 10                 // Getting least significant digit
+        push r4 on stack r2             // Pushing least significant digit
+
+        r3 := r3 / 10                   // Checking number of digits left 
+
+        // Base case handling
+        if (r3 == 0) goto print_base_case               
+
+        // Recursive call
+        goto print_recurr linking r4                    
+
+        // Printing out the least significant n-1 digits
+        pop r3 off stack r2             // Getting digit
+        r3 := r3 + 48
+        output r3
+        pop r3 off stack r2             // Getting recursive return address
+        goto r3
+
+
+// Name: print_base_case
+// Does: 
+// - Helper function to handle the recursive base case for print_recurr
+// - Prints the first digit of the number, and returns to the previous
+//      recursive return address
+print_base_case:
+        pop r3 off stack r2             // Getting first digit
+        r3 := r3 + 48
+        output r3
+        pop r3 off stack r2             // Getting previous recursive return
+                                        // address         
+        goto r3
+
+
+
+
+        

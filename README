@@ -1,0 +1,43 @@
+------------------------------------------------------
+    Name: Lionel Oh (loh01) & Matthew Kim (mkim27)
+            Comp40: Homework 8
+------------------------------------------------------
+
+ACKNOWLEDGEMENTS OF HELP RECEIVED:
+---------------------------------
+- Wonderful TAs in Halligan :)
+
+
+WHAT HAS BEEN CORRECTLY IMPLEMENTED:
+------------------------------------
+- calc40.ums: contains all calculator-related functions
+- callmain.ums: contains code to call main
+- printd.ums: contains print functions for decimal
+- stack.ums: allocates space for the call stack 
+
+
+DEPARTURES FROM THE RECOMMENDED CALLING CONVENTION:
+---------------------------------------------------
+- N/A
+- Occasionally in certain procdures, r5 is used as a temporary
+register to help with equality comparisons by evoking the 
+"using r5" syntax
+
+
+PRINT MODULE:
+-------------
+- We implemented the print module using a function that recursively prints 
+  out each digit of a number, using modulus and division. 
+
+
+APROXIMATE TIME SPENT ON ASSIGNMENT:
+-----------------------------------
+- 2 to 4 hours analyzing
+- 10 to 12 hours writing assembly code
+- 3 to 5 hours debugging our calculator
+
+
+
+
+
+
